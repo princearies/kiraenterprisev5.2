@@ -1,1 +1,0 @@
-INSERT INTO clients (nama_entiti, tahun_kewangan, jumlah_hasil, jumlah_belanja, untung_bersih, status_cukai) VALUES ("Kedai Kopi Borneo Enterprise", 2025, 45000.00, 18500.00, 26500.00, "Draft"), ("Bengkel Auto Enterprise", 2025, 120000.00, 64000.00, 56000.00, "Selesai"), ("Kedai Roti Seri Enterprise", 2025, 32000.00, 11200.00, 20800.00, "Belum Dihantar");
