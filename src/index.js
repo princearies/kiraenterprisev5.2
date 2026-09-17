@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 
 const app = new Hono();
 
-// Route Utama: Papar Interface HTML
+// Serve UI Interface
 app.get('/', (c) => {
   return c.html(`<!DOCTYPE html>
 <html lang="en">
@@ -72,6 +72,20 @@ app.get('/', (c) => {
   </div>
 
   <script>
+    function parseAmount(val) {
+      if (!val) return 0;
+      if (typeof val === 'number') return val;
+      try {
+        var parsed = JSON.parse(val);
+        if (typeof parsed === 'number') return parsed;
+        if (parsed && parsed.revenue !== undefined) return parseFloat(parsed.revenue) || 0;
+        if (parsed && parsed.expenses !== undefined) return parseFloat(parsed.expenses) || 0;
+      } catch (e) {
+        return parseFloat(val) || 0;
+      }
+      return parseFloat(val) || 0;
+    }
+
     function loadData() {
       fetch('/api/clients')
         .then(function(res) { return res.json(); })
@@ -82,12 +96,16 @@ app.get('/', (c) => {
             json.data.forEach(function(c) {
               var tr = document.createElement('tr');
               tr.className = 'border-b hover:bg-slate-50';
+              
+              var rev = parseAmount(c.revenue);
+              var exp = parseAmount(c.expenses);
+
               tr.innerHTML = 
                 '<td class="p-3 font-mono text-xs text-slate-500">' + (c.client_id || '') + '</td>' +
                 '<td class="p-3 font-medium text-slate-800">' + (c.entity_name || '') + '</td>' +
                 '<td class="p-3 font-semibold text-blue-600">' + (c.entity_type || '') + '</td>' +
-                '<td class="p-3 font-semibold text-emerald-600">' + Number(c.revenue || 0).toFixed(2) + '</td>' +
-                '<td class="p-3 font-semibold text-rose-600">' + Number(c.expenses || 0).toFixed(2) + '</td>' +
+                '<td class="p-3 font-semibold text-emerald-600">RM ' + rev.toFixed(2) + '</td>' +
+                '<td class="p-3 font-semibold text-rose-600">RM ' + exp.toFixed(2) + '</td>' +
                 '<td class="p-3"><span class="bg-slate-100 text-slate-700 text-xs px-2 py-1 rounded font-medium">' + (c.status || 'Draft') + '</span></td>';
               tbody.appendChild(tr);
             });
@@ -139,17 +157,18 @@ app.get('/api/clients', async (c) => {
         entity_name,
         entity_type,
         status,
+        company_meta,
         COALESCE(
           json_extract(company_meta, '$.revenue'), 
           json_extract(company_meta, '$.hasil'), 
           json_extract(company_meta, '$.financials.revenue'),
-          0
+          company_meta
         ) AS revenue,
         COALESCE(
           json_extract(company_meta, '$.expenses'), 
           json_extract(company_meta, '$.belanja'), 
           json_extract(company_meta, '$.financials.expenses'),
-          0
+          company_meta
         ) AS expenses
       FROM client_entries
       ORDER BY created_at DESC
