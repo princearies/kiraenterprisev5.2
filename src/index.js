@@ -1,12 +1,8 @@
 import { Hono } from 'hono';
-import { serveStatic } from 'hono/cloudflare-workers';
 
 const app = new Hono();
 
-// Serve static HTML dari folder public/
-app.get('*', serveStatic({ root: './' }));
-
-// API: Ambil senarai clients & extract JSON
+// GET clients API endpoint
 app.get('/api/clients', async (c) => {
   try {
     const { results } = await c.env.DB.prepare(`
@@ -37,7 +33,7 @@ app.get('/api/clients', async (c) => {
   }
 });
 
-// API: Simpan entry baru ke D1
+// POST client API endpoint
 app.post('/api/clients', async (c) => {
   try {
     const body = await c.req.json();
