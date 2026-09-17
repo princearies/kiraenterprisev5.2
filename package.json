@@ -1,5 +1,17 @@
 {
+  "name": "kiraenterprisev5.2",
+  "version": "5.2.0",
+  "description": "Sistem Buku Akaun & Laporan Kewangan untuk Sabah Small Enterprise",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "test": "echo \"No tests specified\""
+  },
   "dependencies": {
     "hono": "^4.13.8"
+  },
+  "devDependencies": {
+    "wrangler": "^3.0.0"
   }
 }
