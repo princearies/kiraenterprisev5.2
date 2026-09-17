@@ -1,300 +1,265 @@
-const HTML_CONTENT = `<!DOCTYPE html>
-<html lang="ms">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>KiraEnterpriseV5.2 - Sistem Buku Akaun & Laporan Kewangan</title>
-  <style>
-    :root {
-      --primary: #1e3a8a;
-      --secondary: #0d9488;
-      --bg: #f8fafc;
-      --card: #ffffff;
-      --text: #0f172a;
-    }
-    body {
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      background-color: var(--bg);
-      color: var(--text);
-      margin: 0;
-      padding: 20px;
-    }
-    .container {
-      max-width: 900px;
-      margin: 0 auto;
-    }
-    h1, h2 {
-      color: var(--primary);
-    }
-    .card {
-      background: var(--card);
-      border-radius: 8px;
-      padding: 24px;
-      box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
-      margin-bottom: 24px;
-    }
-    .form-group {
-      margin-bottom: 16px;
-    }
-    label {
-      display: block;
-      font-weight: 600;
-      margin-bottom: 6px;
-      font-size: 0.9rem;
-    }
-    input {
-      width: 100%;
-      padding: 10px;
-      border: 1px solid #cbd5e1;
-      border-radius: 6px;
-      box-sizing: border-box;
-    }
-    .btn-group {
-      display: flex;
-      gap: 12px;
-      margin-top: 20px;
-    }
-    button {
-      flex: 1;
-      padding: 12px;
-      border: none;
-      border-radius: 6px;
-      font-weight: bold;
-      cursor: pointer;
-      transition: background 0.2s;
-    }
-    .btn-submit {
-      background-color: var(--primary);
-      color: white;
-    }
-    .btn-fetch {
-      background-color: var(--secondary);
-      color: white;
-    }
-    button:hover {
-      opacity: 0.9;
-    }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-top: 16px;
-    }
-    th, td {
-      border: 1px solid #e2e8f0;
-      padding: 10px;
-      text-align: left;
-      font-size: 0.9rem;
-    }
-    th {
-      background-color: #f1f5f9;
-      color: var(--primary);
-    }
-    .status-msg {
-      margin-top: 12px;
-      font-weight: 600;
-      font-size: 0.85rem;
-    }
-  </style>
-</head>
-<body>
+import { Hono } from 'hono';
 
-<div class="container">
-  <h1>KiraEnterpriseV5.2</h1>
-  <p><em>Modul Catatan Penyata Kewangan & Imbangan Duga Enterprise</em></p>
+const app = new Hono();
 
-  <div class="card">
-    <h2>Catatan Penutupan Akaun (Year-End Entry)</h2>
-    <form id="accountingForm">
-      <div class="form-group">
-        <label for="businessName">Nama Entiti Perniagaan (Enterprise Name)</label>
-        <input type="text" id="businessName" placeholder="Contoh: Kedai Kopi Borneo Enterprise" required>
-      </div>
-      
-      <div class="form-group">
-        <label for="financialYear">Tahun Kewangan (Financial Year - FY)</label>
-        <input type="number" id="financialYear" value="2025" required>
-      </div>
+// ==========================================
+// API ENDPOINTS (Cloudflare D1 JSON Logic)
+// ==========================================
 
-      <div class="form-group">
-        <label for="totalRevenue">Jumlah Hasil / Jualan (Total Revenue - RM)</label>
-        <input type="number" step="0.01" id="totalRevenue" placeholder="0.00" required>
-      </div>
+// 1. GET ALL CLIENTS (Fetch and extract JSON fields into clean key-value objects)
+app.get('/api/clients', async (c) => {
+  try {
+    const { results } = await c.env.DB.prepare(`
+      SELECT 
+        client_id, 
+        json_extract(company_meta, '$.name') AS name, 
+        json_extract(company_meta, '$.type') AS type,
+        json_extract(company_meta, '$.taxRate') AS tax_rate,
+        json_extract(company_meta, '$.yearEnd') AS year_end,
+        json_extract(company_meta, '$.hasil') AS hasil,
+        json_extract(company_meta, '$.belanja') AS belanja,
+        json_extract(company_meta, '$.status_cukai') AS status_cukai
+      FROM client_entries
+      ORDER BY client_id DESC
+    `).all();
 
-      <div class="form-group">
-        <label for="totalExpense">Jumlah Perbelanjaan / Belanja Kendalian (Total Expenses - RM)</label>
-        <input type="number" step="0.01" id="totalExpense" placeholder="0.00" required>
-      </div>
-
-      <div class="btn-group">
-        <button type="button" class="btn-submit" onclick="submitFinancialReport()">
-           Pos Ke Lejar (Save to D1)
-        </button>
-        <button type="button" class="btn-fetch" onclick="fetchFinancialReports()">
-           Tarik Penyata (Pull Records)
-        </button>
-      </div>
-      <div id="statusMsg" class="status-msg"></div>
-    </form>
-  </div>
-
-  <div class="card">
-    <h2>Lejar Imbangan Duga & Penyata Untung Rugi</h2>
-    <table>
-      <thead>
-        <tr>
-          <th>ID</th>
-          <th>Entiti Perniagaan</th>
-          <th>Tahun Kewangan</th>
-          <th>Jumlah Hasil (RM)</th>
-          <th>Jumlah Belanja (RM)</th>
-          <th>Untung Bersih (RM)</th>
-          <th>Tarikh Kemaskini</th>
-        </tr>
-      </thead>
-      <tbody id="ledgerTableBody">
-        <tr>
-          <td colspan="7" style="text-align: center; color: #64748b;">Klik "Tarik Penyata" untuk memuat turun rekod lejar.</td>
-        </tr>
-      </tbody>
-    </table>
-  </div>
-</div>
-
-<script>
-  const WORKER_URL = window.location.origin;
-
-  async function submitFinancialReport() {
-    const statusDiv = document.getElementById('statusMsg');
-    statusDiv.style.color = 'blue';
-    statusDiv.innerText = 'Sedang memproses catatan akaun...';
-
-    const payload = {
-      business_name: document.getElementById('businessName').value,
-      financial_year: parseInt(document.getElementById('financialYear').value),
-      total_revenue: parseFloat(document.getElementById('totalRevenue').value),
-      total_expense: parseFloat(document.getElementById('totalExpense').value)
-    };
-
-    if (!payload.business_name || isNaN(payload.total_revenue) || isNaN(payload.total_expense)) {
-      statusDiv.style.color = 'red';
-      statusDiv.innerText = 'Ralat: Sila isi semua butiran perakaunan dengan betul.';
-      return;
-    }
-
-    try {
-      const response = await fetch(\`\${WORKER_URL}/api/save-report\`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-
-      const result = await response.json();
-      if (result.success) {
-        statusDiv.style.color = 'green';
-        statusDiv.innerText = 'Berjaya! Rekod imbangan telah disimpan ke Cloudflare D1 (mykira).';
-        fetchFinancialReports();
-      } else {
-        throw new Error(result.message || 'Gagal menyimpan rekod.');
-      }
-    } catch (err) {
-      statusDiv.style.color = 'red';
-      statusDiv.innerText = 'Ralat Sambungan: ' + err.message;
-    }
+    return c.json({ success: true, count: results.length, data: results });
+  } catch (err) {
+    return c.json({ success: false, error: err.message }, 500);
   }
+});
 
-  async function fetchFinancialReports() {
-    const tbody = document.getElementById('ledgerTableBody');
-    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;">Memuat turun data lejar...</td></tr>';
+// 2. GET SINGLE CLIENT BY ID
+app.get('/api/clients/:id', async (c) => {
+  try {
+    const clientId = c.req.param('id');
+    const record = await c.env.DB.prepare(`
+      SELECT 
+        client_id, 
+        company_meta
+      FROM client_entries 
+      WHERE client_id = ?
+    `).bind(clientId).first();
 
-    try {
-      const response = await fetch(\`\${WORKER_URL}/api/get-reports\`);
-      const data = await response.json();
-
-      if (data.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;">Tiada rekod imbangan ditemui.</td></tr>';
-        return;
-      }
-
-      tbody.innerHTML = '';
-      data.forEach(row => {
-        const tr = document.createElement('tr');
-        tr.innerHTML = \`
-          <td>\${row.id}</td>
-          <td><strong>\${row.business_name}</strong></td>
-          <td>FY\${row.financial_year}</td>
-          <td style="color: green;">\${row.total_revenue.toFixed(2)}</td>
-          <td style="color: red;">\${row.total_expense.toFixed(2)}</td>
-          <td><strong>\${row.net_profit.toFixed(2)}</strong></td>
-          <td>\${new Date(row.created_at).toLocaleDateString('ms-MY')}</td>
-        \`;
-        tbody.appendChild(tr);
-      });
-    } catch (err) {
-      tbody.innerHTML = \`<tr><td colspan="7" style="color:red; text-align:center;">Gagal memuat turun rekod: \${err.message}</td></tr>\`;
+    if (!record) {
+      return c.json({ success: false, message: 'Client not found' }, 404);
     }
+
+    return c.json({
+      success: true,
+      client_id: record.client_id,
+      company_meta: JSON.parse(record.company_meta)
+    });
+  } catch (err) {
+    return c.json({ success: false, error: err.message }, 500);
   }
-</script>
+});
 
-</body>
-</html>`;
+// 3. POST NEW CLIENT ENTRY (Save metadata as JSON string)
+app.post('/api/clients', async (c) => {
+  try {
+    const body = await c.req.json();
+    
+    // Generate a unique client ID if not provided
+    const clientId = body.client_id || `ent-${Math.floor(1000 + Math.random() * 9000)}`;
+    
+    const hasil = parseFloat(body.jumlah_hasil) || 0;
+    const belanja = parseFloat(body.jumlah_belanja) || 0;
+    const untungBersih = hasil - belanja;
 
-export default {
-  async fetch(request, env) {
-    const url = new URL(request.url);
+    const companyMeta = JSON.stringify({
+      name: body.nama_entiti || 'Perusahaan Tanpa Nama',
+      type: body.jenis_entiti || 'enterprise',
+      taxRate: body.tax_rate ?? 0,
+      yearEnd: parseInt(body.tahun_kewangan, 10) || 2025,
+      hasil: hasil,
+      belanja: belanja,
+      untung_bersih: untungBersih,
+      status_cukai: body.status_cukai || 'Draft'
+    });
 
-    if (request.method === "OPTIONS") {
-      return new Response(null, {
-        headers: {
-          "Access-Control-Allow-Origin": "*",
-          "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-          "Access-Control-Allow-Headers": "Content-Type",
-        },
-      });
+    await c.env.DB.prepare(
+      'INSERT INTO client_entries (client_id, company_meta) VALUES (?, ?)'
+    ).bind(clientId, companyMeta).run();
+
+    return c.json({ 
+      success: true, 
+      message: 'Entry successfully saved to D1 database.', 
+      client_id: clientId 
+    }, 201);
+  } catch (err) {
+    return c.json({ success: false, error: err.message }, 500);
+  }
+});
+
+// 4. PUT UPDATE CLIENT METADATA
+app.put('/api/clients/:id', async (c) => {
+  try {
+    const clientId = c.req.param('id');
+    const body = await c.req.json();
+
+    const record = await c.env.DB.prepare(`
+      SELECT company_meta FROM client_entries WHERE client_id = ?
+    `).bind(clientId).first();
+
+    if (!record) {
+      return c.json({ success: false, message: 'Client not found' }, 404);
     }
 
-    const corsHeaders = {
-      "Access-Control-Allow-Origin": "*",
-      "Content-Type": "application/json",
-    };
+    const currentMeta = JSON.parse(record.company_meta);
+    const updatedMeta = JSON.stringify({
+      ...currentMeta,
+      ...body
+    });
 
-    // Serve HTML GUI at Root URL
-    if (request.method === "GET" && url.pathname === "/") {
-      return new Response(HTML_CONTENT, {
-        headers: { "Content-Type": "text/html;charset=UTF-8" },
-      });
-    }
+    await c.env.DB.prepare(`
+      UPDATE client_entries SET company_meta = ? WHERE client_id = ?
+    `).bind(updatedMeta, clientId).run();
 
-    // API: Save Report
-    if (request.method === "POST" && url.pathname === "/api/save-report") {
-      try {
-        const data = await request.json();
-        const netProfit = data.total_revenue - data.total_expense;
+    return c.json({ success: true, message: 'Client metadata updated successfully' });
+  } catch (err) {
+    return c.json({ success: false, error: err.message }, 500);
+  }
+});
 
-        const query = `
-          INSERT INTO clients (business_name, financial_year, total_revenue, total_expense, net_profit)
-          VALUES (?, ?, ?, ?, ?)
-        `;
+// 5. DELETE CLIENT ENTRY
+app.delete('/api/clients/:id', async (c) => {
+  try {
+    const clientId = c.req.param('id');
+    await c.env.DB.prepare('DELETE FROM client_entries WHERE client_id = ?').bind(clientId).run();
+    return c.json({ success: true, message: `Client ${clientId} deleted successfully` });
+  } catch (err) {
+    return c.json({ success: false, error: err.message }, 500);
+  }
+});
 
-        await env.DB.prepare(query)
-          .bind(data.business_name, data.financial_year, data.total_revenue, data.total_expense, netProfit)
-          .run();
+// ==========================================
+// FRONTEND INTERFACE HTML RENDERER
+// ==========================================
 
-        return new Response(JSON.stringify({ success: true }), { headers: corsHeaders });
-      } catch (err) {
-        return new Response(JSON.stringify({ success: false, message: err.message }), { status: 500, headers: corsHeaders });
-      }
-    }
+app.get('/', (c) => {
+  return c.html(`
+    <!DOCTYPE html>
+    <html lang="ms">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>KiraEnterpriseV5.2 - Sistem Buku</title>
+      <script src="https://cdn.tailwindcss.com"></script>
+    </head>
+    <body class="bg-slate-100 text-slate-800 font-sans p-6">
+      <div class="max-w-4xl mx-auto space-y-6">
+        <header class="border-b pb-4">
+          <h1 class="text-3xl font-bold text-blue-900">KiraEnterpriseV5.2</h1>
+          <p class="text-slate-600 text-sm italic">Modul Catatan Penyata Kewangan & Imbangan Duga Enterprise</p>
+        </header>
 
-    // API: Get Reports
-    if (request.method === "GET" && url.pathname === "/api/get-reports") {
-      try {
-        const { results } = await env.DB.prepare("SELECT * FROM clients ORDER BY created_at DESC").all();
-        return new Response(JSON.stringify(results), { headers: corsHeaders });
-      } catch (err) {
-        return new Response(JSON.stringify({ error: err.message }), { status: 500, headers: corsHeaders });
-      }
-    }
+        <!-- INPUT FORM -->
+        <div class="bg-white p-6 rounded-xl shadow-md border">
+          <h2 class="text-xl font-bold text-blue-900 mb-4">Catatan Penutup Akaun (Year-End Entry)</h2>
+          <form id="entryForm" class="space-y-4">
+            <div>
+              <label class="block text-sm font-semibold mb-1">Nama Entiti Perniagaan (Enterprise Name)</label>
+              <input type="text" id="nama_entiti" required placeholder="Contoh: Kedai Kopi Borneo Enterprise" class="w-full border rounded-md p-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+            </div>
 
-    return new Response("Not Found", { status: 404 });
-  },
-};
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label class="block text-sm font-semibold mb-1">Tahun Kewangan (FY)</label>
+                <input type="number" id="tahun_kewangan" value="2025" required class="w-full border rounded-md p-2 text-sm">
+              </div>
+              <div>
+                <label class="block text-sm font-semibold mb-1">Jumlah Hasil / Jualan (RM)</label>
+                <input type="number" step="0.01" id="jumlah_hasil" placeholder="0.00" required class="w-full border rounded-md p-2 text-sm">
+              </div>
+              <div>
+                <label class="block text-sm font-semibold mb-1">Jumlah Perbelanjaan (RM)</label>
+                <input type="number" step="0.01" id="jumlah_belanja" placeholder="0.00" required class="w-full border rounded-md p-2 text-sm">
+              </div>
+            </div>
+
+            <div class="flex gap-4 pt-2">
+              <button type="submit" class="w-full bg-blue-900 hover:bg-blue-800 text-white font-bold py-2 px-4 rounded-md transition text-sm">Pos Ke Lejar (Save to D1)</button>
+              <button type="button" id="btnPull" class="w-full bg-teal-600 hover:bg-teal-500 text-white font-bold py-2 px-4 rounded-md transition text-sm">Tarik Penyata (Pull Records)</button>
+            </div>
+          </form>
+        </div>
+
+        <!-- RECORDS DISPLAY TABLE -->
+        <div class="bg-white p-6 rounded-xl shadow-md border">
+          <h2 class="text-xl font-bold text-blue-900 mb-4">Lejar Imbangan Duga & Penyata Untung Rugi</h2>
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-sm border-collapse">
+              <thead>
+                <tr class="bg-slate-100 border-b">
+                  <th class="p-3">ID Client</th>
+                  <th class="p-3">Nama Entiti</th>
+                  <th class="p-3">Jenis</th>
+                  <th class="p-3">Hasil (RM)</th>
+                  <th class="p-3">Belanja (RM)</th>
+                  <th class="p-3">Status</th>
+                </tr>
+              </thead>
+              <tbody id="recordsTable">
+                <tr><td colspan="6" class="p-4 text-center text-slate-500">Klik 'Tarik Penyata' untuk memuatkan data dari D1.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <script>
+        document.getElementById('entryForm').addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const payload = {
+            nama_entiti: document.getElementById('nama_entiti').value,
+            tahun_kewangan: document.getElementById('tahun_kewangan').value,
+            jumlah_hasil: document.getElementById('jumlah_hasil').value,
+            jumlah_belanja: document.getElementById('jumlah_belanja').value,
+          };
+
+          const res = await fetch('/api/clients', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+
+          const data = await res.json();
+          if (data.success) {
+            alert('Rekod berjaya disimpan: ' + data.client_id);
+            document.getElementById('entryForm').reset();
+            loadRecords();
+          } else {
+            alert('Ralat: ' + data.error);
+          }
+        });
+
+        document.getElementById('btnPull').addEventListener('click', loadRecords);
+
+        async function loadRecords() {
+          const res = await fetch('/api/clients');
+          const result = await res.json();
+          const tbody = document.getElementById('recordsTable');
+          
+          if (result.success && result.data.length > 0) {
+            tbody.innerHTML = result.data.map(row => \`
+              <tr class="border-b hover:bg-slate-50">
+                <td class="p-3 font-mono text-xs">\${row.client_id}</td>
+                <td class="p-3 font-medium">\${row.name || '-'}</td>
+                <td class="p-3 font-semibold uppercase text-xs text-blue-700">\${row.type || '-'}</td>
+                <td class="p-3 font-mono text-emerald-600">\${row.hasil ? parseFloat(row.hasil).toFixed(2) : '0.00'}</td>
+                <td class="p-3 font-mono text-rose-600">\${row.belanja ? parseFloat(row.belanja).toFixed(2) : '0.00'}</td>
+                <td class="p-3"><span class="px-2 py-1 bg-slate-200 text-xs rounded">\${row.status_cukai || 'Draft'}</span></td>
+              </tr>
+            \`).join('');
+          } else {
+            tbody.innerHTML = '<tr><td colspan="6" class="p-4 text-center text-slate-500">Tiada rekod dijumpai.</td></tr>';
+          }
+        }
+      </script>
+    </body>
+    </html>
+  `);
+});
+
+export default app;
