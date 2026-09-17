@@ -1,0 +1,1 @@
+CREATE TABLE IF NOT EXISTS clients (id INTEGER PRIMARY KEY AUTOINCREMENT, nama_entiti TEXT NOT NULL, tahun_kewangan INTEGER NOT NULL, jumlah_hasil REAL DEFAULT 0.0, jumlah_belanja REAL DEFAULT 0.0, untung_bersih REAL DEFAULT 0.0, status_cukai TEXT DEFAULT "Belum Dihantar", created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
