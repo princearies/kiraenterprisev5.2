@@ -2,9 +2,9 @@ import { Hono } from 'hono';
 
 const app = new Hono();
 
-// Serve static HTML UI directly
+// Serve UI via HTML string (no template literal variable evaluation bugs)
 app.get('/', (c) => {
-  return c.html(`<!DOCTYPE html>
+  const htmlContent = `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -72,57 +72,63 @@ app.get('/', (c) => {
   </div>
 
   <script>
-    async function fetchClients() {
-      try {
-        const res = await fetch('/api/clients');
-        const json = await res.json();
-        if (json.success) {
-          const tbody = document.getElementById('tableBody');
-          tbody.innerHTML = '';
-          json.data.forEach(function(c) {
-            const tr = document.createElement('tr');
-            tr.className = 'border-b hover:bg-slate-50';
-            tr.innerHTML = 
-              '<td class="p-3 font-mono text-xs text-slate-500">' + (c.client_id || '') + '</td>' +
-              '<td class="p-3 font-medium text-slate-800">' + (c.entity_name || '') + '</td>' +
-              '<td class="p-3 font-semibold text-blue-600">' + (c.entity_type || '') + '</td>' +
-              '<td class="p-3 font-semibold text-emerald-600">' + Number(c.revenue || 0).toFixed(2) + '</td>' +
-              '<td class="p-3 font-semibold text-rose-600">' + Number(c.expenses || 0).toFixed(2) + '</td>' +
-              '<td class="p-3"><span class="bg-slate-100 text-slate-700 text-xs px-2 py-1 rounded font-medium">' + (c.status || 'Draft') + '</span></td>';
-            tbody.appendChild(tr);
-          });
-        }
-      } catch (err) {
-        alert('Failed to load data: ' + err.message);
-      }
+    function loadData() {
+      fetch('/api/clients')
+        .then(function(res) { return res.json(); })
+        .then(function(json) {
+          if (json.success) {
+            var tbody = document.getElementById('tableBody');
+            tbody.innerHTML = '';
+            json.data.forEach(function(c) {
+              var tr = document.createElement('tr');
+              tr.className = 'border-b hover:bg-slate-50';
+              tr.innerHTML = 
+                '<td class="p-3 font-mono text-xs text-slate-500">' + (c.client_id || '') + '</td>' +
+                '<td class="p-3 font-medium text-slate-800">' + (c.entity_name || '') + '</td>' +
+                '<td class="p-3 font-semibold text-blue-600">' + (c.entity_type || '') + '</td>' +
+                '<td class="p-3 font-semibold text-emerald-600">' + Number(c.revenue || 0).toFixed(2) + '</td>' +
+                '<td class="p-3 font-semibold text-rose-600">' + Number(c.expenses || 0).toFixed(2) + '</td>' +
+                '<td class="p-3"><span class="bg-slate-100 text-slate-700 text-xs px-2 py-1 rounded font-medium">' + (c.status || 'Draft') + '</span></td>';
+              tbody.appendChild(tr);
+            });
+          }
+        })
+        .catch(function(err) {
+          alert('Fetch error: ' + err.message);
+        });
     }
 
-    document.getElementById('btnPull').onclick = fetchClients;
+    document.getElementById('btnPull').onclick = function() {
+      loadData();
+    };
 
-    document.getElementById('clientForm').onsubmit = async function(e) {
+    document.getElementById('clientForm').onsubmit = function(e) {
       e.preventDefault();
-      const body = {
+      var bodyData = {
         entity_name: document.getElementById('entity_name').value,
         fy: document.getElementById('fy').value,
         revenue: parseFloat(document.getElementById('revenue').value),
         expenses: parseFloat(document.getElementById('expenses').value)
       };
-      const res = await fetch('/api/clients', {
+      fetch('/api/clients', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body)
+        body: JSON.stringify(bodyData)
+      })
+      .then(function(res) { return res.json(); })
+      .then(function(json) {
+        if (json.success) {
+          alert('Berjaya disimpan ke D1!');
+          loadData();
+        } else {
+          alert('Ralat: ' + json.error);
+        }
       });
-      const json = await res.json();
-      if (json.success) {
-        alert('Berjaya disimpan ke D1!');
-        fetchClients();
-      } else {
-        alert('Ralat: ' + json.error);
-      }
     };
   </script>
 </body>
-</html>`);
+</html>`;
+  return c.html(htmlContent);
 });
 
 // GET clients endpoint
