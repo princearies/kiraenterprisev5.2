@@ -3,8 +3,8 @@ import { Hono } from 'hono';
 const app = new Hono();
 
 // Serve HTML UI
-app.get('/', async (c) => {
-  return c.html(/* html */ `
+app.get('/', (c) => {
+  return c.html(`
     <!DOCTYPE html>
     <html lang="en">
     <head>
@@ -74,20 +74,24 @@ app.get('/', async (c) => {
 
       <script>
         async function fetchClients() {
-          const res = await fetch('/api/clients');
-          const json = await res.json();
-          if (json.success) {
-            const tbody = document.getElementById('tableBody');
-            tbody.innerHTML = json.data.map(c => \`
-              <tr class="border-b hover:bg-slate-50">
-                <td class="p-3 font-mono text-xs text-slate-500">\${c.client_id}</td>
-                <td class="p-3 font-medium text-slate-800">\${c.entity_name}</td>
-                <td class="p-3 font-semibold text-blue-600">\${c.entity_type}</td>
-                <td class="p-3 font-semibold text-emerald-600">\${Number(c.revenue || 0).toFixed(2)}</td>
-                <td class="p-3 font-semibold text-rose-600">\${Number(c.expenses || 0).toFixed(2)}</td>
-                <td class="p-3"><span class="bg-slate-100 text-slate-700 text-xs px-2 py-1 rounded font-medium">\${c.status || 'Draft'}</span></td>
-              </tr>
-            \`).join('');
+          try {
+            const res = await fetch('/api/clients');
+            const json = await res.json();
+            if (json.success) {
+              const tbody = document.getElementById('tableBody');
+              tbody.innerHTML = json.data.map(c => \`
+                <tr class="border-b hover:bg-slate-50">
+                  <td class="p-3 font-mono text-xs text-slate-500">\${c.client_id}</td>
+                  <td class="p-3 font-medium text-slate-800">\${c.entity_name}</td>
+                  <td class="p-3 font-semibold text-blue-600">\${c.entity_type}</td>
+                  <td class="p-3 font-semibold text-emerald-600">\${Number(c.revenue || 0).toFixed(2)}</td>
+                  <td class="p-3 font-semibold text-rose-600">\${Number(c.expenses || 0).toFixed(2)}</td>
+                  <td class="p-3"><span class="bg-slate-100 text-slate-700 text-xs px-2 py-1 rounded font-medium">\${c.status || 'Draft'}</span></td>
+                </tr>
+              \`).join('');
+            }
+          } catch (err) {
+            alert('Failed to load data: ' + err.message);
           }
         }
 
